@@ -1,9 +1,11 @@
 package main
 
 import (
-	"lendbook/internal/infrastructure/pgx"
+	"lendbook/internal/delivery/http/handler"
+	"lendbook/internal/infrastructure/postgres"
+	"lendbook/internal/usecase"
 	"log"
-	"net/http"
+	"os"
 
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
@@ -15,18 +17,32 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
-	db, err := pgx.InitDb()
-	if err != nil {
-		panic(err)
+	jwtsecret := os.Getenv("JWT_SECRET")
+	if jwtsecret == "" {
+		log.Fatal("JWT_SECRET environment variable not set")
 	}
 
-	if db != nil {
-		log.Println("Connected to db")
+	dbPool, err := postgres.InitDb()
+	if err != nil {
+		log.Fatal("Error connecting to database")
 	}
+
+	defer dbPool.Close()
+
+	userRepo := postgres.NewUserRepository(dbPool)
+	userUseCase := usecase.NewUserUsecase(userRepo, jwtsecret)
+	userHandler := handler.NewUserHandler(userUseCase)
 
 	e := echo.New()
-	e.GET("/", func(c echo.Context) error {
-		return c.String(http.StatusOK, "Hello, World!")
-	})
-	e.Logger.Fatal(e.Start(":1323"))
+	e.POST("/register", userHandler.Register)
+	e.POST("/login", userHandler.Login)
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	if err := e.Start(":" + port); err != nil {
+		e.Logger.Fatal(err)
+	}
+
 }
