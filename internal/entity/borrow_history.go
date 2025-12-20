@@ -2,7 +2,7 @@ package entity
 
 import "time"
 
-type BorrowRecord struct {
+type BorrowHistory struct {
 	ID         int        `json:"id"`
 	BookID     int        `json:"book_id"`
 	UserID     int        `json:"user_id"`
