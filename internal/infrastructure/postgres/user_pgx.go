@@ -42,7 +42,7 @@ func (u *userRepository) GetByEmail(ctx context.Context, email string) (*entity.
 	return &user, nil
 }
 
-func (u *userRepository) GetByID(ctx context.Context, id string) (*entity.User, error) {
+func (u *userRepository) GetByID(ctx context.Context, id int) (*entity.User, error) {
 	query := `SELECT id, email, password FROM users WHERE id = $1`
 
 	var user entity.User
