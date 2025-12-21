@@ -3,6 +3,7 @@ package main
 import (
 	"lendbook/internal/delivery/http/handler"
 	"lendbook/internal/infrastructure/postgres"
+	"lendbook/internal/middleware"
 	"lendbook/internal/usecase"
 	"log"
 	"os"
@@ -33,9 +34,23 @@ func main() {
 	userUseCase := usecase.NewUserUsecase(userRepo, jwtsecret)
 	userHandler := handler.NewUserHandler(userUseCase)
 
+	bookRepo := postgres.NewBookRepository(dbPool)
+	bookUseCase := usecase.NewBookUsecase(bookRepo)
+	bookHandler := handler.NewBookHandler(bookUseCase)
+
 	e := echo.New()
 	e.POST("/register", userHandler.Register)
 	e.POST("/login", userHandler.Login)
+
+	protected := e.Group("")
+	protected.Use(middleware.AuthMiddleware(jwtsecret))
+
+	protected.POST("/books", bookHandler.AddBook)
+	protected.GET("/books", bookHandler.ListBooks)
+	protected.GET("/books/:id", bookHandler.GetBookDetails)
+	protected.DELETE("/books/:id", bookHandler.DeleteBook)
+	protected.POST("/books/:id/borrow", bookHandler.BorrowBook)
+	protected.POST("/books/:id/return", bookHandler.ReturnBook)
 
 	port := os.Getenv("PORT")
 	if port == "" {
