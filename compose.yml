@@ -7,23 +7,24 @@ services:
       dockerfile: Dockerfile
     container_name: lendbook-app
     ports:
-      - "${PORT}:${PORT}"
+      - "${APP_HOST_PORT:-8080}:8080"
     depends_on:
       - db
     env_file:
       - .env
     environment:
+      - PORT=8080
+      - DATABASE_HOST=db
+      - DATABASE_PORT=5432
       - DATABASE_USER=${DATABASE_USER}
       - DATABASE_PASSWORD=${DATABASE_PASSWORD}
       - DATABASE_NAME=${DATABASE_NAME}
-      - DATABASE_PORT=${DATABASE_PORT}
-      - DATABASE_HOST=db
       - JWT_SECRET=${JWT_SECRET}
   db:
     image: "postgres:16.11-alpine3.23"
     container_name: lendbook-db
     ports:
-      - "${DATABASE_PORT}:5432"
+      - "${DB_HOST_PORT:-5432}:5432"
     env_file:
       - .env
     environment:

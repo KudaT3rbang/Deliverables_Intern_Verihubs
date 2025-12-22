@@ -16,8 +16,6 @@ WORKDIR /
 
 COPY --from=build-stage /lendbook /lendbook
 
-EXPOSE 8080
-
 USER nonroot:nonroot
 
 ENTRYPOINT ["/lendbook"]
