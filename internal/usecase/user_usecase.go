@@ -29,6 +29,14 @@ func NewUserUsecase(repo repository.UserRepository, secret string) UserUsecase {
 }
 
 func (u *userUsecase) Register(ctx context.Context, email string, password string) (string, error) {
+	if email == "" {
+		return "", errors.New("email cannot be empty")
+	}
+
+	if password == "" {
+		return "", errors.New("password cannot be empty")
+	}
+
 	findUser, _ := u.repo.GetByEmail(ctx, email)
 	if findUser != nil {
 		return "", errors.New("email address already exists")
@@ -52,6 +60,14 @@ func (u *userUsecase) Register(ctx context.Context, email string, password strin
 }
 
 func (u *userUsecase) Login(ctx context.Context, email string, password string) (string, error) {
+	if email == "" {
+		return "", errors.New("email cannot be empty")
+	}
+	
+	if password == "" {
+		return "", errors.New("password cannot be empty")
+	}
+
 	user, err := u.repo.GetByEmail(ctx, email)
 	if err != nil {
 		return "", errors.New("invalid email or password")
