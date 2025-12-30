@@ -16,6 +16,8 @@ WORKDIR /
 
 COPY --from=build-stage /lendbook /lendbook
 
+COPY db/migrations ./db/migrations
+
 USER nonroot:nonroot
 
 ENTRYPOINT ["/lendbook"]
