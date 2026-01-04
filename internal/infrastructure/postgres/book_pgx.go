@@ -28,6 +28,7 @@ func (b *bookRepository) Create(ctx context.Context, book *entity.Book) error {
 		Language:      book.Language,
 		AddedAt:       pgtype.Timestamp{Time: book.AddedAt, Valid: true},
 		AddedBy:       int32(book.AddedBy),
+		MaxBorrowDays: int32(book.MaxBorrowDays),
 	}
 
 	id, err := b.queries.CreateBook(ctx, params)
@@ -51,6 +52,7 @@ func (b *bookRepository) GetByID(ctx context.Context, id int) (*entity.Book, err
 		Author:        row.Author,
 		PublishedDate: row.PublishedDate.Time,
 		Language:      row.Language,
+		MaxBorrowDays: int(row.MaxBorrowDays),
 		AddedAt:       row.AddedAt.Time,
 		AddedBy:       int(row.AddedBy),
 	}
@@ -89,6 +91,7 @@ func (b *bookRepository) Update(ctx context.Context, book *entity.Book) error {
 		Language:      book.Language,
 		DeletedAt:     deletedAt,
 		DeletedBy:     deletedBy,
+		MaxBorrowDays: int32(book.MaxBorrowDays),
 		ID:            int32(book.ID),
 	}
 
@@ -109,6 +112,7 @@ func (b *bookRepository) ListAvailable(ctx context.Context) ([]entity.Book, erro
 			Author:        row.Author,
 			PublishedDate: row.PublishedDate.Time,
 			Language:      row.Language,
+			MaxBorrowDays: int(row.MaxBorrowDays),
 			AddedAt:       row.AddedAt.Time,
 			AddedBy:       int(row.AddedBy),
 		})
@@ -118,9 +122,10 @@ func (b *bookRepository) ListAvailable(ctx context.Context) ([]entity.Book, erro
 
 func (b *bookRepository) CreateBorrowHistory(ctx context.Context, borrow *entity.BorrowHistory) error {
 	params := generated.CreateBorrowHistoryParams{
-		BookID:     int32(borrow.BookID),
-		UserID:     int32(borrow.UserID),
-		BorrowedAt: pgtype.Timestamp{Time: borrow.BorrowedAt, Valid: true},
+		BookID:        int32(borrow.BookID),
+		UserID:        int32(borrow.UserID),
+		BorrowedAt:    pgtype.Timestamp{Time: borrow.BorrowedAt, Valid: true},
+		BorrowedUntil: pgtype.Timestamp{Time: borrow.BorrowedUntil, Valid: true},
 	}
 
 	id, err := b.queries.CreateBorrowHistory(ctx, params)
@@ -141,10 +146,11 @@ func (b *bookRepository) GetBorrowHistory(ctx context.Context, bookid int) ([]en
 	histories := make([]entity.BorrowHistory, 0, len(rows))
 	for _, row := range rows {
 		h := entity.BorrowHistory{
-			ID:         int(row.ID),
-			BookID:     int(row.BookID),
-			UserID:     int(row.UserID),
-			BorrowedAt: row.BorrowedAt.Time,
+			ID:            int(row.ID),
+			BookID:        int(row.BookID),
+			UserID:        int(row.UserID),
+			BorrowedAt:    row.BorrowedAt.Time,
+			BorrowedUntil: row.BorrowedUntil.Time,
 		}
 
 		if row.ReturnedAt.Valid {
@@ -172,10 +178,11 @@ func (b *bookRepository) GetActiveBorrowHistory(ctx context.Context, userid, boo
 	}
 
 	h := &entity.BorrowHistory{
-		ID:         int(row.ID),
-		BookID:     int(row.BookID),
-		UserID:     int(row.UserID),
-		BorrowedAt: row.BorrowedAt.Time,
+		ID:            int(row.ID),
+		BookID:        int(row.BookID),
+		UserID:        int(row.UserID),
+		BorrowedAt:    row.BorrowedAt.Time,
+		BorrowedUntil: row.BorrowedUntil.Time,
 	}
 
 	if row.ReturnedAt.Valid {
@@ -200,4 +207,32 @@ func (b *bookRepository) UpdateBorrowHistory(ctx context.Context, borrow *entity
 	}
 
 	return b.queries.UpdateBorrowHistoryReturnDate(ctx, params)
+}
+
+func (b *bookRepository) GetOverdueBorrows(ctx context.Context) ([]entity.OverdueBorrow, error) {
+	rows, err := b.queries.GetOverdueBorrows(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	overdueBorrows := make([]entity.OverdueBorrow, 0, len(rows))
+	for _, row := range rows {
+		ob := entity.OverdueBorrow{
+			BorrowHistory: entity.BorrowHistory{
+				ID:            int(row.ID),
+				BookID:        int(row.BookID),
+				UserID:        int(row.UserID),
+				BorrowedAt:    row.BorrowedAt.Time,
+				BorrowedUntil: row.BorrowedUntil.Time,
+			},
+			BookTitle: row.BookTitle,
+		}
+		if row.ReturnedAt.Valid {
+			t := row.ReturnedAt.Time
+			ob.ReturnedAt = &t
+		}
+		overdueBorrows = append(overdueBorrows, ob)
+	}
+
+	return overdueBorrows, nil
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"lendbook/internal/delivery/http/handler"
 	"lendbook/internal/infrastructure/postgres"
 	"lendbook/internal/middleware"
@@ -10,10 +11,12 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
+	"github.com/riverqueue/river/riverdriver/riverpgxv5"
+	"github.com/riverqueue/river/rivermigrate"
 )
 
 func main() {
-	err := godotenv.Load(".env")
+	err := godotenv.Load(". env")
 	if err != nil {
 		log.Println("Error loading .env file")
 	}
@@ -27,7 +30,6 @@ func main() {
 	if err != nil {
 		log.Fatal("Error connecting to database")
 	}
-
 	defer dbPool.Close()
 
 	migrationsPath := os.Getenv("MIGRATIONS_PATH")
@@ -38,6 +40,16 @@ func main() {
 	log.Println("Running database migrations...")
 	if err := postgres.RunMigration(dbPool, migrationsPath); err != nil {
 		log.Fatalf("Failed to run migrations: %v", err)
+	}
+	
+	log.Println("Running River migrations...")
+	migrator, err := rivermigrate.New(riverpgxv5.New(dbPool), nil)
+	if err != nil {
+		log.Fatalf("Failed to create River migrator: %v", err)
+	}
+	_, err = migrator.Migrate(context.Background(), rivermigrate.DirectionUp, nil)
+	if err != nil {
+		log.Fatalf("Failed to run River migrations: %v", err)
 	}
 
 	userRepo := postgres.NewUserRepository(dbPool)
@@ -69,5 +81,4 @@ func main() {
 	if err := e.Start(":" + port); err != nil {
 		e.Logger.Fatal(err)
 	}
-
 }

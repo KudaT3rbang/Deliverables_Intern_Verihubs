@@ -44,11 +44,17 @@ func (b *bookUsecase) AddBook(ctx context.Context, userid int, params entity.Add
 		return errors.New("invalid published date")
 	}
 
+	maxBorrowDays := params.MaxBorrowDays
+	if maxBorrowDays <= 0 {
+		maxBorrowDays = 14
+	}
+
 	newBook := entity.Book{
 		Title:         params.Title,
 		Author:        params.Author,
 		PublishedDate: params.PublishedDate,
 		Language:      params.Language,
+		MaxBorrowDays: maxBorrowDays,
 		AddedBy:       userid,
 		AddedAt:       time.Now(),
 	}
@@ -124,11 +130,16 @@ func (b *bookUsecase) BorrowBook(ctx context.Context, userid int, bookid int) er
 	if isBorrowed {
 		return errors.New("book is borrowed by others")
 	}
+
+	now := time.Now()
+	borrowedUntil := now.AddDate(0, 0, borrowBook.MaxBorrowDays)
+
 	borrow := entity.BorrowHistory{
-		BookID:     bookid,
-		UserID:     userid,
-		BorrowedAt: time.Now(),
-		ReturnedAt: nil,
+		BookID:        bookid,
+		UserID:        userid,
+		BorrowedAt:    now,
+		BorrowedUntil: borrowedUntil,
+		ReturnedAt:    nil,
 	}
 
 	return b.repo.CreateBorrowHistory(ctx, &borrow)

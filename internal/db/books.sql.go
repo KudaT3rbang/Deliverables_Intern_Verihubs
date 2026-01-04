@@ -12,8 +12,8 @@ import (
 )
 
 const createBook = `-- name: CreateBook :one
-INSERT INTO books (title, author, published_date, language, added_at, added_by)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO books (title, author, published_date, language, added_at, added_by, max_borrow_days)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING id
 `
 
@@ -24,6 +24,7 @@ type CreateBookParams struct {
 	Language      string           `json:"language"`
 	AddedAt       pgtype.Timestamp `json:"added_at"`
 	AddedBy       int32            `json:"added_by"`
+	MaxBorrowDays int32            `json:"max_borrow_days"`
 }
 
 func (q *Queries) CreateBook(ctx context.Context, arg CreateBookParams) (int32, error) {
@@ -34,6 +35,7 @@ func (q *Queries) CreateBook(ctx context.Context, arg CreateBookParams) (int32, 
 		arg.Language,
 		arg.AddedAt,
 		arg.AddedBy,
+		arg.MaxBorrowDays,
 	)
 	var id int32
 	err := row.Scan(&id)
@@ -41,7 +43,7 @@ func (q *Queries) CreateBook(ctx context.Context, arg CreateBookParams) (int32, 
 }
 
 const getBookByID = `-- name: GetBookByID :one
-SELECT id, title, author, published_date, language, added_at, added_by, deleted_at, deleted_by
+SELECT id, title, author, published_date, language, added_at, added_by, deleted_at, deleted_by, max_borrow_days
 FROM books
 WHERE id = $1
 `
@@ -59,12 +61,13 @@ func (q *Queries) GetBookByID(ctx context.Context, id int32) (Book, error) {
 		&i.AddedBy,
 		&i.DeletedAt,
 		&i.DeletedBy,
+		&i.MaxBorrowDays,
 	)
 	return i, err
 }
 
 const listAvailableBooks = `-- name: ListAvailableBooks :many
-SELECT id, title, author, published_date, language, added_at, added_by
+SELECT id, title, author, published_date, language, added_at, added_by, max_borrow_days
 FROM books
 WHERE deleted_at IS NULL
 `
@@ -77,6 +80,7 @@ type ListAvailableBooksRow struct {
 	Language      string           `json:"language"`
 	AddedAt       pgtype.Timestamp `json:"added_at"`
 	AddedBy       int32            `json:"added_by"`
+	MaxBorrowDays int32            `json:"max_borrow_days"`
 }
 
 func (q *Queries) ListAvailableBooks(ctx context.Context) ([]ListAvailableBooksRow, error) {
@@ -96,6 +100,7 @@ func (q *Queries) ListAvailableBooks(ctx context.Context) ([]ListAvailableBooksR
 			&i.Language,
 			&i.AddedAt,
 			&i.AddedBy,
+			&i.MaxBorrowDays,
 		); err != nil {
 			return nil, err
 		}
@@ -109,8 +114,8 @@ func (q *Queries) ListAvailableBooks(ctx context.Context) ([]ListAvailableBooksR
 
 const updateBook = `-- name: UpdateBook :exec
 UPDATE books
-SET title=$1, author=$2, published_date=$3, language=$4, deleted_at=$5, deleted_by=$6
-WHERE id=$7
+SET title=$1, author=$2, published_date=$3, language=$4, deleted_at=$5, deleted_by=$6, max_borrow_days=$7
+WHERE id=$8
 `
 
 type UpdateBookParams struct {
@@ -120,6 +125,7 @@ type UpdateBookParams struct {
 	Language      string           `json:"language"`
 	DeletedAt     pgtype.Timestamp `json:"deleted_at"`
 	DeletedBy     *int32           `json:"deleted_by"`
+	MaxBorrowDays int32            `json:"max_borrow_days"`
 	ID            int32            `json:"id"`
 }
 
@@ -131,6 +137,7 @@ func (q *Queries) UpdateBook(ctx context.Context, arg UpdateBookParams) error {
 		arg.Language,
 		arg.DeletedAt,
 		arg.DeletedBy,
+		arg.MaxBorrowDays,
 		arg.ID,
 	)
 	return err

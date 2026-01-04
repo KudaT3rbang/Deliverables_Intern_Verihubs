@@ -12,26 +12,32 @@ import (
 )
 
 const createBorrowHistory = `-- name: CreateBorrowHistory :one
-INSERT INTO borrow_history (book_id, user_id, borrowed_at)
-VALUES ($1, $2, $3)
+INSERT INTO borrow_history (book_id, user_id, borrowed_at, borrowed_until)
+VALUES ($1, $2, $3, $4)
 RETURNING id
 `
 
 type CreateBorrowHistoryParams struct {
-	BookID     int32            `json:"book_id"`
-	UserID     int32            `json:"user_id"`
-	BorrowedAt pgtype.Timestamp `json:"borrowed_at"`
+	BookID        int32            `json:"book_id"`
+	UserID        int32            `json:"user_id"`
+	BorrowedAt    pgtype.Timestamp `json:"borrowed_at"`
+	BorrowedUntil pgtype.Timestamp `json:"borrowed_until"`
 }
 
 func (q *Queries) CreateBorrowHistory(ctx context.Context, arg CreateBorrowHistoryParams) (int32, error) {
-	row := q.db.QueryRow(ctx, createBorrowHistory, arg.BookID, arg.UserID, arg.BorrowedAt)
+	row := q.db.QueryRow(ctx, createBorrowHistory,
+		arg.BookID,
+		arg.UserID,
+		arg.BorrowedAt,
+		arg.BorrowedUntil,
+	)
 	var id int32
 	err := row.Scan(&id)
 	return id, err
 }
 
 const getActiveBorrowHistory = `-- name: GetActiveBorrowHistory :one
-SELECT id, book_id, user_id, borrowed_at, returned_at
+SELECT id, book_id, user_id, borrowed_at, borrowed_until, returned_at
 FROM borrow_history
 WHERE user_id = $1 AND book_id = $2 AND returned_at IS NULL
 `
@@ -41,17 +47,72 @@ type GetActiveBorrowHistoryParams struct {
 	BookID int32 `json:"book_id"`
 }
 
-func (q *Queries) GetActiveBorrowHistory(ctx context.Context, arg GetActiveBorrowHistoryParams) (BorrowHistory, error) {
+type GetActiveBorrowHistoryRow struct {
+	ID            int32            `json:"id"`
+	BookID        int32            `json:"book_id"`
+	UserID        int32            `json:"user_id"`
+	BorrowedAt    pgtype.Timestamp `json:"borrowed_at"`
+	BorrowedUntil pgtype.Timestamp `json:"borrowed_until"`
+	ReturnedAt    pgtype.Timestamp `json:"returned_at"`
+}
+
+func (q *Queries) GetActiveBorrowHistory(ctx context.Context, arg GetActiveBorrowHistoryParams) (GetActiveBorrowHistoryRow, error) {
 	row := q.db.QueryRow(ctx, getActiveBorrowHistory, arg.UserID, arg.BookID)
-	var i BorrowHistory
+	var i GetActiveBorrowHistoryRow
 	err := row.Scan(
 		&i.ID,
 		&i.BookID,
 		&i.UserID,
 		&i.BorrowedAt,
+		&i.BorrowedUntil,
 		&i.ReturnedAt,
 	)
 	return i, err
+}
+
+const getOverdueBorrows = `-- name: GetOverdueBorrows :many
+SELECT bh.id, bh.book_id, bh.user_id, bh. borrowed_at, bh.borrowed_until, bh.returned_at, b.title as book_title
+FROM borrow_history bh
+     JOIN books b ON bh. book_id = b.id
+WHERE bh.returned_at IS NULL AND bh.borrowed_until < NOW()
+`
+
+type GetOverdueBorrowsRow struct {
+	ID            int32            `json:"id"`
+	BookID        int32            `json:"book_id"`
+	UserID        int32            `json:"user_id"`
+	BorrowedAt    pgtype.Timestamp `json:"borrowed_at"`
+	BorrowedUntil pgtype.Timestamp `json:"borrowed_until"`
+	ReturnedAt    pgtype.Timestamp `json:"returned_at"`
+	BookTitle     string           `json:"book_title"`
+}
+
+func (q *Queries) GetOverdueBorrows(ctx context.Context) ([]GetOverdueBorrowsRow, error) {
+	rows, err := q.db.Query(ctx, getOverdueBorrows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetOverdueBorrowsRow
+	for rows.Next() {
+		var i GetOverdueBorrowsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.BookID,
+			&i.UserID,
+			&i.BorrowedAt,
+			&i.BorrowedUntil,
+			&i.ReturnedAt,
+			&i.BookTitle,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const isBookBorrowed = `-- name: IsBookBorrowed :one
@@ -70,26 +131,36 @@ func (q *Queries) IsBookBorrowed(ctx context.Context, bookID int32) (bool, error
 }
 
 const listBorrowHistoryByBookID = `-- name: ListBorrowHistoryByBookID :many
-SELECT id, book_id, user_id, borrowed_at, returned_at
+SELECT id, book_id, user_id, borrowed_at, borrowed_until, returned_at
 FROM borrow_history
 WHERE book_id = $1
 ORDER BY borrowed_at DESC
 `
 
-func (q *Queries) ListBorrowHistoryByBookID(ctx context.Context, bookID int32) ([]BorrowHistory, error) {
+type ListBorrowHistoryByBookIDRow struct {
+	ID            int32            `json:"id"`
+	BookID        int32            `json:"book_id"`
+	UserID        int32            `json:"user_id"`
+	BorrowedAt    pgtype.Timestamp `json:"borrowed_at"`
+	BorrowedUntil pgtype.Timestamp `json:"borrowed_until"`
+	ReturnedAt    pgtype.Timestamp `json:"returned_at"`
+}
+
+func (q *Queries) ListBorrowHistoryByBookID(ctx context.Context, bookID int32) ([]ListBorrowHistoryByBookIDRow, error) {
 	rows, err := q.db.Query(ctx, listBorrowHistoryByBookID, bookID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []BorrowHistory
+	var items []ListBorrowHistoryByBookIDRow
 	for rows.Next() {
-		var i BorrowHistory
+		var i ListBorrowHistoryByBookIDRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.BookID,
 			&i.UserID,
 			&i.BorrowedAt,
+			&i.BorrowedUntil,
 			&i.ReturnedAt,
 		); err != nil {
 			return nil, err

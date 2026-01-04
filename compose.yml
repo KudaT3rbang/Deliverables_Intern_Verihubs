@@ -23,6 +23,19 @@ services:
       - DATABASE_NAME=${DATABASE_NAME}
       - JWT_SECRET=${JWT_SECRET}
     restart: on-failure
+  worker:
+    build: .
+    container_name: lendbook-worker
+    depends_on:
+      - app
+    environment:
+      - DATABASE_HOST=db
+      - DATABASE_PORT=5432
+      - DATABASE_USER=${DATABASE_USER}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
+      - DATABASE_NAME=${DATABASE_NAME}
+    entrypoint: [ "/worker" ]
+    restart: on-failure
   db:
     image: "postgres:16.11-alpine3.23"
     container_name: lendbook-db

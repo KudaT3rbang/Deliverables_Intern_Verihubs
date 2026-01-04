@@ -15,4 +15,5 @@ type BookRepository interface {
 	IsBookBorrowed(ctx context.Context, bookid int) (bool, error)
 	GetActiveBorrowHistory(ctx context.Context, userid, bookid int) (*entity.BorrowHistory, error)
 	UpdateBorrowHistory(ctx context.Context, borrow *entity.BorrowHistory) error
+	GetOverdueBorrows(ctx context.Context) ([]entity.OverdueBorrow, error)
 }
